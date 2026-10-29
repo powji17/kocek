@@ -46,3 +46,14 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Firebase (dibuat ulang lewat `flutterfire configure`)
+android/app/google-services.json
+lib/firebase_options.dart
+firebase.json
+
+# Kunci tanda tangan APK rilis
+*.jks
+*.keystore
+key.properties
+android/key.properties

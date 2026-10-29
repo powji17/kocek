@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/theme/app_theme.dart';
-import 'features/shell/app_shell.dart';
+import 'features/auth/presentation/auth_gate.dart';
 
 class KocekApp extends StatelessWidget {
   const KocekApp({super.key});
@@ -21,7 +21,8 @@ class KocekApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const AppShell(),
+      // Belum login -> LoginScreen, sudah login -> AppShell.
+      home: const AuthGate(),
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../shared/widgets/placeholder_screen.dart';
 import '../home/home_screen.dart';
+import '../settings/settings_screen.dart';
 import '../transactions/quick_add_sheet.dart';
 
 /// Kerangka utama: bottom navigation 4 tab (PRD bagian 10).
@@ -30,11 +31,7 @@ class _AppShellState extends State<AppShell> {
       title: 'Statistik',
       message: 'Grafik donat, batang, dan garis hadir di Langkah 8.',
     ),
-    PlaceholderScreen(
-      icon: Icons.settings_outlined,
-      title: 'Pengaturan',
-      message: 'Dompet, kategori, target, dan akun hadir bertahap.',
-    ),
+    SettingsScreen(),
   ];
 
   @override
