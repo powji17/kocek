@@ -1,11 +1,13 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../data/providers.dart';
 import '../auth/providers.dart';
 
-/// Pengaturan. Untuk sekarang baru bagian Akun (login/keluar);
-/// dompet, kategori, target, dan hapus data hadir di langkah berikutnya.
+/// Pengaturan. Sekarang: Akun (keluar) dan Data (hapus semua data).
+/// Dompet, kategori, target, dan tampilan hadir di langkah berikutnya.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -32,6 +34,60 @@ class SettingsScreen extends ConsumerWidget {
     if (confirmed == true) {
       await ref.read(authRepositoryProvider).signOut();
       // AuthGate otomatis kembali ke layar login.
+    }
+  }
+
+  Future<void> _confirmDeleteAll(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus semua data?'),
+        content: const Text(
+          'Semua dompet, transaksi, kategori, dan target akan dihapus '
+          'permanen dari perangkat dan cloud. Tindakan ini tidak bisa '
+          'dibatalkan. Akun Google-mu tidak ikut dihapus.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'Hapus semua',
+              style: TextStyle(color: AppColors.expense),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Menghapus data...')));
+    try {
+      final repo = ref.read(userDataRepositoryProvider);
+      await repo?.deleteAllData();
+      // Isi ulang kategori bawaan supaya aplikasi tetap siap dipakai.
+      await repo?.ensureDefaults();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Semua data sudah dihapus.')),
+        );
+    } on FirebaseException catch (e) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Gagal menghapus data (${e.code}). Pastikan terhubung ke internet.',
+            ),
+          ),
+        );
     }
   }
 
@@ -98,15 +154,32 @@ class SettingsScreen extends ConsumerWidget {
         const SizedBox(height: 12),
         Card(
           child: ListTile(
-            leading: const Icon(Icons.logout_rounded, color: AppColors.expense),
+            leading: const Icon(Icons.logout_rounded),
             title: const Text('Keluar'),
             onTap: () => _confirmSignOut(context, ref),
           ),
         ),
         const SizedBox(height: 24),
+        Text(
+          'Data',
+          style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(
+              Icons.delete_outline_rounded,
+              color: AppColors.expense,
+            ),
+            title: const Text('Hapus semua data'),
+            subtitle: const Text('Butuh internet. Tidak bisa dibatalkan.'),
+            onTap: () => _confirmDeleteAll(context, ref),
+          ),
+        ),
+        const SizedBox(height: 24),
         Center(
           child: Text(
-            'Dompet, kategori, target, tampilan, dan hapus data\nhadir di langkah berikutnya.',
+            'Dompet, kategori, target, dan tampilan\nhadir di langkah berikutnya.',
             textAlign: TextAlign.center,
             style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),

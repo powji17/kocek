@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../bootstrap/bootstrap_gate.dart';
 import '../../shell/app_shell.dart';
 import '../providers.dart';
 import 'login_screen.dart';
@@ -13,7 +14,9 @@ class AuthGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider);
     return auth.when(
-      data: (user) => user == null ? const LoginScreen() : const AppShell(),
+      data: (user) => user == null
+          ? const LoginScreen()
+          : const BootstrapGate(child: AppShell()),
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
