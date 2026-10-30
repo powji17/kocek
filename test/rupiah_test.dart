@@ -17,6 +17,12 @@ void main() {
     });
   });
 
+  group('formatThousands', () {
+    test('tanpa awalan Rp', () => expect(formatThousands(1500000), '1.500.000'));
+    test('kecil', () => expect(formatThousands(42), '42'));
+    test('negatif dibaca positif', () => expect(formatThousands(-2500), '2.500'));
+  });
+
   group('parseRupiahInput', () {
     test('teks berformat', () => expect(parseRupiahInput('Rp 1.500.000'), 1500000));
     test('hanya angka', () => expect(parseRupiahInput('25000'), 25000));

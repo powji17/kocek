@@ -2,16 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
+import '../onboarding/onboarding_screen.dart';
 
-/// Pengisian awal (kategori bawaan) sekali per pengguna.
-final bootstrapProvider = FutureProvider<void>((ref) async {
+/// Pengecekan awal per pengguna: mengisi kategori bawaan dan membaca apakah
+/// onboarding sudah selesai (true = sudah).
+final bootstrapProvider = FutureProvider<bool>((ref) async {
   final repo = ref.watch(userDataRepositoryProvider);
-  if (repo == null) return;
-  await repo.ensureDefaults();
+  if (repo == null) return true;
+  return repo.bootstrap();
 });
 
-/// Menahan layar utama sebentar sampai pengecekan awal selesai.
-/// ensureDefaults() tidak pernah melempar error, jadi aplikasi selalu lanjut.
+/// Penanda "baru saja menyelesaikan onboarding" agar layar langsung pindah
+/// tanpa menunggu server. Otomatis kembali false saat akun berganti.
+class OnboardingCompletedNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    ref.watch(userDocProvider);
+    return false;
+  }
+
+  void markCompleted() => state = true;
+
+  void reset() => state = false;
+}
+
+final onboardingCompletedProvider =
+    NotifierProvider<OnboardingCompletedNotifier, bool>(
+  OnboardingCompletedNotifier.new,
+);
+
+/// Menentukan layar setelah login: onboarding (pengguna baru) atau [child].
 class BootstrapGate extends ConsumerWidget {
   const BootstrapGate({super.key, required this.child});
 
@@ -23,6 +43,8 @@ class BootstrapGate extends ConsumerWidget {
     if (boot.isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return child;
+    final onboardingDone =
+        (boot.value ?? true) || ref.watch(onboardingCompletedProvider);
+    return onboardingDone ? child : const OnboardingScreen();
   }
 }

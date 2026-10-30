@@ -1,74 +1,111 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/ui/icon_keys.dart';
 import '../../core/utils/rupiah.dart';
+import '../../data/models/goal.dart';
+import '../../data/models/wallet.dart';
+import '../../data/providers.dart';
+import '../../domain/balances.dart';
 
-/// Data CONTOH untuk melihat tampilan tema. Diganti data asli
-/// (Firestore) pada Langkah 3–5.
-class _Preview {
-  _Preview._();
-
-  static const tunai = 850000;
-  static const dana = 2400000;
-  static const goalName = 'HP Baru';
-  static const goalCollected = 2000000;
-  static const goalTarget = 6000000;
-}
-
-/// Beranda — urutan konten mengikuti PRD F4.
-class HomeScreen extends StatelessWidget {
+/// Beranda. Langkah 4: saldo total, dompet, dan target memakai data asli.
+/// Ringkasan bulan ini dan transaksi terbaru menyusul di Langkah 5.
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(balanceSummaryProvider);
+    final wallets = ref.watch(walletsProvider).value ?? const <Wallet>[];
+    final goals = ref.watch(goalsProvider).value ?? const <Goal>[];
+
+    return summaryAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text('Gagal memuat data.\n$error'),
+        ),
+      ),
+      data: (summary) => _HomeContent(
+        summary: summary,
+        wallets: wallets,
+        goals: goals,
+      ),
+    );
+  }
+}
+
+class _HomeContent extends StatelessWidget {
+  const _HomeContent({
+    required this.summary,
+    required this.wallets,
+    required this.goals,
+  });
+
+  final BalanceSummary summary;
+  final List<Wallet> wallets;
+  final List<Goal> goals;
+
+  @override
   Widget build(BuildContext context) {
-    const total = _Preview.tunai + _Preview.dana;
-    const freeBalance = total - _Preview.goalCollected;
     final text = Theme.of(context).textTheme;
+    final activeWallets = wallets.where((w) => w.active).toList();
+    final activeGoals = goals.where((g) => g.isActive).toList();
 
     return ListView(
       // Padding bawah ekstra supaya konten tidak tertutup tombol +.
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
       children: [
-        const _BalanceCard(total: total, freeBalance: freeBalance),
+        _BalanceCard(
+          total: summary.totalSavings,
+          freeBalance: activeGoals.isEmpty ? null : summary.freeBalance,
+        ),
         const SizedBox(height: 24),
         const _SectionTitle('Dompet'),
         const SizedBox(height: 12),
-        const Row(
-          children: [
-            Expanded(
-              child: _WalletTile(
-                icon: Icons.payments_outlined,
-                name: 'Tunai',
-                amount: _Preview.tunai,
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: _WalletTile(
-                icon: Icons.account_balance_wallet_outlined,
-                name: 'DANA',
-                amount: _Preview.dana,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const _SectionTitle('Target'),
-        const SizedBox(height: 12),
-        const _GoalCard(
-          name: _Preview.goalName,
-          collected: _Preview.goalCollected,
-          target: _Preview.goalTarget,
-        ),
-        const SizedBox(height: 24),
-        Center(
-          child: Text(
-            'Tampilan contoh — data asli menyusul di langkah berikutnya.',
-            textAlign: TextAlign.center,
-            style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
+        if (activeWallets.isEmpty)
+          Text(
+            'Belum ada dompet aktif. Atur di Pengaturan > Kelola dompet.',
+            style: text.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final tileWidth = (constraints.maxWidth - 12) / 2;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final w in activeWallets)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _WalletTile(
+                        wallet: w,
+                        balance: summary.walletBalances[w.id] ?? 0,
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
-        ),
+        if (activeGoals.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          const _SectionTitle('Target'),
+          const SizedBox(height: 12),
+          for (final g in activeGoals)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _GoalCard(
+                goal: g,
+                collected: summary.goalCollected[g.id] ?? 0,
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -95,7 +132,9 @@ class _BalanceCard extends StatelessWidget {
   const _BalanceCard({required this.total, required this.freeBalance});
 
   final int total;
-  final int freeBalance;
+
+  /// null = tidak ada target aktif, jadi tidak ditampilkan.
+  final int? freeBalance;
 
   @override
   Widget build(BuildContext context) {
@@ -124,21 +163,23 @@ class _BalanceCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              'Saldo bebas ${formatRupiah(freeBalance)}',
-              style: AppTheme.numeric(text.labelLarge).copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+          if (freeBalance != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'Saldo bebas ${formatRupiah(freeBalance!)}',
+                style: AppTheme.numeric(text.labelLarge).copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -146,15 +187,10 @@ class _BalanceCard extends StatelessWidget {
 }
 
 class _WalletTile extends StatelessWidget {
-  const _WalletTile({
-    required this.icon,
-    required this.name,
-    required this.amount,
-  });
+  const _WalletTile({required this.wallet, required this.balance});
 
-  final IconData icon;
-  final String name;
-  final int amount;
+  final Wallet wallet;
+  final int balance;
 
   @override
   Widget build(BuildContext context) {
@@ -172,16 +208,24 @@ class _WalletTile extends StatelessWidget {
                 color: AppColors.primarySoft,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, size: 22, color: AppColors.primaryDark),
+              child: Icon(
+                iconForKey(wallet.iconKey),
+                size: 22,
+                color: AppColors.primaryDark,
+              ),
             ),
             const SizedBox(height: 12),
             Text(
-              name,
+              wallet.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: text.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 2),
             Text(
-              formatRupiah(amount),
+              formatRupiah(balance),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: AppTheme.numeric(text.titleMedium).copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -194,22 +238,19 @@ class _WalletTile extends StatelessWidget {
 }
 
 class _GoalCard extends StatelessWidget {
-  const _GoalCard({
-    required this.name,
-    required this.collected,
-    required this.target,
-  });
+  const _GoalCard({required this.goal, required this.collected});
 
-  final String name;
+  final Goal goal;
   final int collected;
-  final int target;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final progress = target == 0 ? 0.0 : (collected / target).clamp(0.0, 1.0);
+    final target = goal.targetAmount;
+    final progress = target <= 0 ? 0.0 : (collected / target).clamp(0.0, 1.0);
     final percent = (progress * 100).round();
-    final remaining = target - collected;
+    final remaining = max(0, target - collected);
+    final accent = Color(goal.colorValue);
 
     return Card(
       child: Padding(
@@ -223,19 +264,17 @@ class _GoalCard extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.goal.withValues(alpha: 0.15),
+                    color: accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.smartphone_outlined,
-                    size: 22,
-                    color: AppColors.goal,
-                  ),
+                  child: Icon(iconForKey(goal.iconKey), size: 22, color: accent),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    name,
+                    goal.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: text.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -245,7 +284,6 @@ class _GoalCard extends StatelessWidget {
                   '$percent%',
                   style: AppTheme.numeric(text.titleMedium).copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -261,7 +299,7 @@ class _GoalCard extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: value,
                   minHeight: 10,
-                  color: AppColors.goal,
+                  color: accent,
                   backgroundColor: AppColors.divider,
                 ),
               ),
@@ -275,7 +313,9 @@ class _GoalCard extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'Sisa ${formatRupiah(remaining)} lagi, semangat!',
+              progress >= 1
+                  ? 'Target tercapai, selamat!'
+                  : 'Sisa ${formatRupiah(remaining)} lagi, semangat!',
               style: AppTheme.numeric(text.bodyMedium).copyWith(
                 fontWeight: FontWeight.w600,
               ),

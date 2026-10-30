@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/providers.dart';
 import '../auth/providers.dart';
+import '../bootstrap/bootstrap_gate.dart';
+import '../wallets/wallets_screen.dart';
 
-/// Pengaturan. Sekarang: Akun (keluar) dan Data (hapus semua data).
-/// Dompet, kategori, target, dan tampilan hadir di langkah berikutnya.
+/// Pengaturan. Sekarang: Akun, Keuangan (kelola dompet), dan Data.
+/// Kategori, target, dan tampilan hadir di langkah berikutnya.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -69,10 +71,11 @@ class SettingsScreen extends ConsumerWidget {
       ..hideCurrentSnackBar()
       ..showSnackBar(const SnackBar(content: Text('Menghapus data...')));
     try {
-      final repo = ref.read(userDataRepositoryProvider);
-      await repo?.deleteAllData();
-      // Isi ulang kategori bawaan supaya aplikasi tetap siap dipakai.
-      await repo?.ensureDefaults();
+      await ref.read(userDataRepositoryProvider)?.deleteAllData();
+      // Mulai ulang dari awal: pengecekan awal dijalankan lagi (kategori
+      // bawaan diisi ulang) dan pengguna kembali ke onboarding.
+      ref.read(onboardingCompletedProvider.notifier).reset();
+      ref.invalidate(bootstrapProvider);
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -161,6 +164,23 @@ class SettingsScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
         Text(
+          'Keuangan',
+          style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.account_balance_wallet_outlined),
+            title: const Text('Kelola dompet'),
+            subtitle: const Text('Ubah, tambah, atau sembunyikan dompet'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const WalletsScreen()),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
           'Data',
           style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
@@ -179,7 +199,7 @@ class SettingsScreen extends ConsumerWidget {
         const SizedBox(height: 24),
         Center(
           child: Text(
-            'Dompet, kategori, target, dan tampilan\nhadir di langkah berikutnya.',
+            'Kategori, target, dan tampilan\nhadir di langkah berikutnya.',
             textAlign: TextAlign.center,
             style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
