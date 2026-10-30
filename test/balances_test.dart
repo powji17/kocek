@@ -117,4 +117,116 @@ void main() {
     expect(summary.totalSavings, 100000);
     expect(summary.freeBalance, 100000);
   });
+
+  group('target mode otomatis', () {
+    const hpAuto = Goal(
+      id: 'hp',
+      name: 'HP Baru',
+      targetAmount: 6000000,
+      iconKey: 'phone',
+      colorValue: 0xFFF59E0B,
+      fundingMode: GoalFundingMode.auto,
+    );
+
+    test('terkumpul mengikuti total tabungan', () {
+      final summary = BalanceSummary.compute(
+        wallets: [tunai, dana],
+        goals: [hpAuto],
+        transactions: const [],
+      );
+      expect(summary.autoGoalId, 'hp');
+      expect(summary.totalSavings, 600000);
+      expect(summary.goalCollected['hp'], 600000);
+      expect(summary.freeBalance, 0);
+    });
+
+    test('mengubah saldo awal dompet ikut mengubah progres', () {
+      final before = BalanceSummary.compute(
+        wallets: [tunai, dana],
+        goals: [hpAuto],
+        transactions: const [],
+      );
+      final after = BalanceSummary.compute(
+        wallets: [tunai, dana.copyWith(initialBalance: 800000)],
+        goals: [hpAuto],
+        transactions: const [],
+      );
+      expect(before.goalCollected['hp'], 600000);
+      expect(after.goalCollected['hp'], 900000);
+    });
+
+    test('alokasi target manual lain dikecualikan dari target otomatis', () {
+      const liburanAktif = Goal(
+        id: 'liburan',
+        name: 'Liburan',
+        targetAmount: 3000000,
+        iconKey: 'flag',
+        colorValue: 0xFF14B8A6,
+      );
+      final summary = BalanceSummary.compute(
+        wallets: [tunai, dana],
+        goals: [hpAuto, liburanAktif],
+        transactions: [
+          tx(TransactionType.goalDeposit, 100000, wallet: 'dana', goal: 'liburan'),
+        ],
+      );
+      expect(summary.goalCollected['liburan'], 100000);
+      expect(summary.goalCollected['hp'], 500000);
+      expect(summary.freeBalance, 0);
+    });
+
+    test('pengeluaran tertaut ke target otomatis tidak dihitung dua kali', () {
+      final summary = BalanceSummary.compute(
+        wallets: [tunai],
+        goals: [hpAuto],
+        transactions: [
+          tx(TransactionType.expense, 30000, wallet: 'tunai', goal: 'hp'),
+        ],
+      );
+      expect(summary.totalSavings, 70000);
+      expect(summary.goalCollected['hp'], 70000);
+    });
+
+    test('hanya target otomatis aktif pertama yang berlaku', () {
+      const hp2 = Goal(
+        id: 'hp2',
+        name: 'Cadangan',
+        targetAmount: 1000000,
+        iconKey: 'flag',
+        colorValue: 0xFF14B8A6,
+        fundingMode: GoalFundingMode.auto,
+      );
+      final summary = BalanceSummary.compute(
+        wallets: [tunai, dana],
+        goals: [hpAuto, hp2],
+        transactions: [
+          tx(TransactionType.goalDeposit, 50000, wallet: 'tunai', goal: 'hp2'),
+        ],
+      );
+      expect(summary.autoGoalId, 'hp');
+      expect(summary.goalCollected['hp2'], 50000);
+      expect(summary.goalCollected['hp'], 550000);
+    });
+
+    test('target otomatis yang sudah tercapai kembali dihitung manual', () {
+      const hpTercapai = Goal(
+        id: 'hp',
+        name: 'HP Baru',
+        targetAmount: 6000000,
+        iconKey: 'phone',
+        colorValue: 0xFFF59E0B,
+        status: GoalStatus.achieved,
+        fundingMode: GoalFundingMode.auto,
+      );
+      final summary = BalanceSummary.compute(
+        wallets: [tunai, dana],
+        goals: [hpTercapai],
+        transactions: [
+          tx(TransactionType.goalDeposit, 20000, wallet: 'tunai', goal: 'hp'),
+        ],
+      );
+      expect(summary.autoGoalId, isNull);
+      expect(summary.goalCollected['hp'], 20000);
+    });
+  });
 }

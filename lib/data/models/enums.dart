@@ -49,3 +49,24 @@ enum GoalStatus {
     );
   }
 }
+
+/// Cara progres sebuah target dihitung (PRD F6).
+///
+/// - manual : terkumpul = setoran ke target - pengeluaran yang ditautkan
+/// - auto   : terkumpul = seluruh tabungan yang belum dialokasikan ke target
+///            manual lain, sehingga progres ikut naik-turun mengikuti saldo
+enum GoalFundingMode {
+  manual('manual'),
+  auto('otomatis');
+
+  const GoalFundingMode(this.value);
+
+  final String value;
+
+  static GoalFundingMode fromValue(String? value) {
+    return GoalFundingMode.values.firstWhere(
+      (t) => t.value == value,
+      orElse: () => GoalFundingMode.manual,
+    );
+  }
+}

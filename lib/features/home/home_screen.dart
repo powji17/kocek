@@ -6,14 +6,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/icon_keys.dart';
+import '../../core/utils/dates.dart';
 import '../../core/utils/rupiah.dart';
+import '../../data/models/category.dart';
 import '../../data/models/goal.dart';
+import '../../data/models/money_transaction.dart';
 import '../../data/models/wallet.dart';
 import '../../data/providers.dart';
 import '../../domain/balances.dart';
+import '../../domain/monthly_summary.dart';
+import '../../shared/widgets/transaction_tile.dart';
+import '../shell/shell_providers.dart';
 
-/// Beranda. Langkah 4: saldo total, dompet, dan target memakai data asli.
-/// Ringkasan bulan ini dan transaksi terbaru menyusul di Langkah 5.
+/// Beranda (PRD F4): saldo, dompet, target, ringkasan bulan ini, dan
+/// transaksi terbaru, semuanya memakai data asli.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -22,6 +28,9 @@ class HomeScreen extends ConsumerWidget {
     final summaryAsync = ref.watch(balanceSummaryProvider);
     final wallets = ref.watch(walletsProvider).value ?? const <Wallet>[];
     final goals = ref.watch(goalsProvider).value ?? const <Goal>[];
+    final categories = ref.watch(categoriesProvider).value ?? const <Category>[];
+    final transactions =
+        ref.watch(transactionsProvider).value ?? const <MoneyTransaction>[];
 
     return summaryAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -35,6 +44,9 @@ class HomeScreen extends ConsumerWidget {
         summary: summary,
         wallets: wallets,
         goals: goals,
+        categories: categories,
+        transactions: transactions,
+        onSeeAll: () => ref.read(selectedTabProvider.notifier).select(1),
       ),
     );
   }
@@ -45,11 +57,19 @@ class _HomeContent extends StatelessWidget {
     required this.summary,
     required this.wallets,
     required this.goals,
+    required this.categories,
+    required this.transactions,
+    required this.onSeeAll,
   });
 
   final BalanceSummary summary;
   final List<Wallet> wallets;
   final List<Goal> goals;
+  final List<Category> categories;
+
+  /// Terbaru di atas.
+  final List<MoneyTransaction> transactions;
+  final VoidCallback onSeeAll;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +83,10 @@ class _HomeContent extends StatelessWidget {
       children: [
         _BalanceCard(
           total: summary.totalSavings,
-          freeBalance: activeGoals.isEmpty ? null : summary.freeBalance,
+          // Saldo bebas disembunyikan bila ada target otomatis (selalu Rp0).
+          freeBalance: (activeGoals.isEmpty || summary.autoGoalId != null)
+              ? null
+              : summary.freeBalance,
         ),
         const SizedBox(height: 24),
         const _SectionTitle('Dompet'),
@@ -103,9 +126,23 @@ class _HomeContent extends StatelessWidget {
               child: _GoalCard(
                 goal: g,
                 collected: summary.goalCollected[g.id] ?? 0,
+                isAuto: summary.autoGoalId == g.id,
               ),
             ),
         ],
+        const SizedBox(height: 24),
+        _MonthlySummarySection(
+          summary: MonthlySummary.compute(transactions, DateTime.now()),
+          month: DateTime.now(),
+        ),
+        const SizedBox(height: 24),
+        _RecentTransactions(
+          transactions: transactions,
+          categories: categories,
+          wallets: wallets,
+          goals: goals,
+          onSeeAll: onSeeAll,
+        ),
       ],
     );
   }
@@ -238,10 +275,17 @@ class _WalletTile extends StatelessWidget {
 }
 
 class _GoalCard extends StatelessWidget {
-  const _GoalCard({required this.goal, required this.collected});
+  const _GoalCard({
+    required this.goal,
+    required this.collected,
+    required this.isAuto,
+  });
 
   final Goal goal;
   final int collected;
+
+  /// true = progres mengikuti total tabungan.
+  final bool isAuto;
 
   @override
   Widget build(BuildContext context) {
@@ -320,9 +364,179 @@ class _GoalCard extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
+            if (isAuto) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Mengikuti total tabungan',
+                style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MonthlySummarySection extends StatelessWidget {
+  const _MonthlySummarySection({required this.summary, required this.month});
+
+  final MonthlySummary summary;
+  final DateTime month;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _SectionTitle('Ringkasan bulan ini')),
+            Text(
+              formatMonthYear(month),
+              style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _SummaryStat(
+                    label: 'Masuk',
+                    value: formatRupiah(summary.income),
+                    color: AppColors.income,
+                  ),
+                ),
+                Expanded(
+                  child: _SummaryStat(
+                    label: 'Keluar',
+                    value: formatRupiah(summary.expense),
+                    color: AppColors.expense,
+                  ),
+                ),
+                Expanded(
+                  child: _SummaryStat(
+                    label: 'Selisih',
+                    value: formatRupiah(summary.net, withSign: true),
+                    color: summary.net < 0
+                        ? AppColors.expense
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryStat extends StatelessWidget {
+  const _SummaryStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: AppTheme.numeric(text.titleSmall).copyWith(
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RecentTransactions extends StatelessWidget {
+  const _RecentTransactions({
+    required this.transactions,
+    required this.categories,
+    required this.wallets,
+    required this.goals,
+    required this.onSeeAll,
+  });
+
+  final List<MoneyTransaction> transactions;
+  final List<Category> categories;
+  final List<Wallet> wallets;
+  final List<Goal> goals;
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final recent = transactions.take(5).toList();
+    final categoryMap = {for (final c in categories) c.id: c};
+    final walletMap = {for (final w in wallets) w.id: w};
+    final goalMap = {for (final g in goals) g.id: g};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _SectionTitle('Transaksi terbaru')),
+            if (recent.isNotEmpty)
+              TextButton(onPressed: onSeeAll, child: const Text('Lihat semua')),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (recent.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Belum ada transaksi. Tap Catat untuk mulai.',
+                style: text.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              ),
+            ),
+          )
+        else
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < recent.length; i++) ...[
+                  if (i > 0) const Divider(),
+                  TransactionTile(
+                    transaction: recent[i],
+                    categories: categoryMap,
+                    wallets: walletMap,
+                    goals: goalMap,
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

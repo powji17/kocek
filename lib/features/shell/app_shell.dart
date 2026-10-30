@@ -1,20 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/widgets/placeholder_screen.dart';
 import '../home/home_screen.dart';
 import '../settings/settings_screen.dart';
 import '../transactions/quick_add_sheet.dart';
+import 'shell_providers.dart';
 
 /// Kerangka utama: bottom navigation 4 tab (PRD bagian 10).
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({super.key});
-
-  @override
-  State<AppShell> createState() => _AppShellState();
-}
-
-class _AppShellState extends State<AppShell> {
-  int _index = 0;
 
   static const _titles = ['Kocek', 'Riwayat', 'Statistik', 'Pengaturan'];
 
@@ -35,12 +30,13 @@ class _AppShellState extends State<AppShell> {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final index = ref.watch(selectedTabProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(_titles[_index])),
-      body: IndexedStack(index: _index, children: _screens),
+      appBar: AppBar(title: Text(_titles[index])),
+      body: IndexedStack(index: index, children: _screens),
       // Tombol + hanya di Beranda (PRD F3).
-      floatingActionButton: _index == 0
+      floatingActionButton: index == 0
           ? FloatingActionButton.extended(
               onPressed: () => showQuickAddSheet(context),
               icon: const Icon(Icons.add_rounded),
@@ -48,8 +44,9 @@ class _AppShellState extends State<AppShell> {
             )
           : null,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        selectedIndex: index,
+        onDestinationSelected: (i) =>
+            ref.read(selectedTabProvider.notifier).select(i),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),

@@ -6,7 +6,6 @@ import 'package:firebase_core/firebase_core.dart';
 import '../models/default_categories.dart';
 import '../models/enums.dart';
 import '../models/goal.dart';
-import '../models/money_transaction.dart';
 import '../models/wallet.dart';
 
 /// Isian dompet dari layar onboarding.
@@ -22,19 +21,13 @@ class OnboardingWallet {
   final int initialBalance;
 }
 
-/// Isian target pertama dari layar onboarding.
+/// Isian target pertama dari layar onboarding. Target ini berjalan dalam
+/// mode otomatis: progresnya mengikuti total tabungan.
 class OnboardingGoal {
-  const OnboardingGoal({
-    required this.name,
-    required this.targetAmount,
-    required this.alreadyCollected,
-  });
+  const OnboardingGoal({required this.name, required this.targetAmount});
 
   final String name;
   final int targetAmount;
-
-  /// Bagian dari tabungan yang sudah disisihkan untuk target ini.
-  final int alreadyCollected;
 }
 
 /// Urusan level pengguna: pengisian awal, onboarding, dan penghapusan data.
@@ -82,8 +75,8 @@ class UserDataRepository {
   }
 
   /// Menyimpan hasil onboarding dalam SATU batch (semua atau tidak sama
-  /// sekali): dompet, target pertama (opsional), setoran awal ke target,
-  /// dan penanda onboardingDone.
+  /// sekali): dompet, target pertama (opsional, mode otomatis), dan penanda
+  /// onboardingDone.
   ///
   /// Tidak di-await: saat offline, batch baru selesai setelah ada internet,
   /// sementara data lokal sudah langsung tampil lewat stream.
@@ -93,10 +86,8 @@ class UserDataRepository {
   }) {
     final batch = _userDoc.firestore.batch();
 
-    final walletIds = <String>[];
     for (var i = 0; i < wallets.length; i++) {
       final ref = _userDoc.collection('wallets').doc();
-      walletIds.add(ref.id);
       batch.set(
         ref,
         Wallet(
@@ -119,25 +110,9 @@ class UserDataRepository {
           targetAmount: goal.targetAmount,
           iconKey: 'flag',
           colorValue: 0xFFF59E0B,
+          fundingMode: GoalFundingMode.auto,
         ).toMap(),
       );
-
-      if (goal.alreadyCollected > 0 && walletIds.isNotEmpty) {
-        final txRef = _userDoc.collection('transactions').doc();
-        batch.set(txRef, {
-          ...MoneyTransaction(
-            id: txRef.id,
-            type: TransactionType.goalDeposit,
-            amount: goal.alreadyCollected,
-            walletId: walletIds.first,
-            goalId: goalRef.id,
-            note: 'Saldo awal target',
-            date: DateTime.now(),
-          ).toMap(),
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
     }
 
     batch.set(_userDoc, {'onboardingDone': true}, SetOptions(merge: true));

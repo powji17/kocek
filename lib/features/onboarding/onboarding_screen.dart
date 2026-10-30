@@ -39,7 +39,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   int _step = 0;
   String? _error;
-  bool _collectedTouched = false;
 
   final List<_WalletDraft> _wallets = [
     _WalletDraft(name: 'Tunai', iconKey: 'cash'),
@@ -47,7 +46,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   ];
   final _goalName = TextEditingController(text: 'HP Baru');
   final _goalTarget = TextEditingController();
-  final _goalCollected = TextEditingController();
 
   @override
   void dispose() {
@@ -56,14 +54,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
     _goalName.dispose();
     _goalTarget.dispose();
-    _goalCollected.dispose();
     super.dispose();
   }
-
-  int get _totalBalance => _wallets.fold(
-        0,
-        (sum, w) => sum + parseRupiahInput(w.balance.text),
-      );
 
   void _addWallet() {
     if (_wallets.length >= _maxWallets) return;
@@ -95,11 +87,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     setState(() {
       _error = null;
       _step = 1;
-      // Saran awal: seluruh tabunganmu memang untuk target ini.
-      if (!_collectedTouched) {
-        final total = _totalBalance;
-        _goalCollected.text = total > 0 ? formatThousands(total) : '';
-      }
     });
   }
 
@@ -111,7 +98,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (!skipGoal) {
       final name = _goalName.text.trim();
       final target = parseRupiahInput(_goalTarget.text);
-      final collected = parseRupiahInput(_goalCollected.text);
       if (name.isEmpty) {
         setState(() => _error = 'Nama target tidak boleh kosong.');
         return;
@@ -120,18 +106,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         setState(() => _error = 'Isi nominal target lebih dari Rp0.');
         return;
       }
-      if (collected > _totalBalance) {
-        setState(() {
-          _error = 'Yang sudah terkumpul tidak boleh melebihi total saldo '
-              '${formatRupiah(_totalBalance)}.';
-        });
-        return;
-      }
-      goal = OnboardingGoal(
-        name: name,
-        targetAmount: target,
-        alreadyCollected: collected,
-      );
+      goal = OnboardingGoal(name: name, targetAmount: target);
     }
 
     repo.completeOnboarding(
@@ -307,8 +282,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Lagi nabung buat apa? Target lain bisa ditambah kapan saja, '
-          'dan langkah ini boleh dilewati.',
+          'Lagi nabung buat apa? Progresnya mengikuti total tabunganmu '
+          'secara otomatis. Target lain bisa ditambah kapan saja, dan '
+          'langkah ini boleh dilewati.',
           style: text.bodyMedium?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 20),
@@ -320,14 +296,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const SizedBox(height: 12),
         RupiahField(controller: _goalTarget, label: 'Nominal target'),
-        const SizedBox(height: 12),
-        RupiahField(
-          controller: _goalCollected,
-          label: 'Sudah terkumpul',
-          helperText: 'Dari total saldo ${formatRupiah(_totalBalance)}. '
-              'Diisi otomatis, silakan ubah sesuai kebutuhan.',
-          onChanged: (_) => _collectedTouched = true,
-        ),
       ],
     );
   }

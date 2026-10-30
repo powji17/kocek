@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'enums.dart';
 
 /// Target tabungan (PRD F6). Jumlah "terkumpul" TIDAK disimpan; dihitung
-/// dari transaksi (lihat domain/balances.dart).
+/// dari saldo dan transaksi (lihat domain/balances.dart).
 class Goal {
   const Goal({
     required this.id,
@@ -15,6 +15,7 @@ class Goal {
     this.order = 0,
     this.status = GoalStatus.active,
     this.achievedAt,
+    this.fundingMode = GoalFundingMode.manual,
   });
 
   final String id;
@@ -26,6 +27,9 @@ class Goal {
   final int order;
   final GoalStatus status;
   final DateTime? achievedAt;
+
+  /// Data lama tanpa field ini dibaca sebagai manual.
+  final GoalFundingMode fundingMode;
 
   bool get isActive => status == GoalStatus.active;
 
@@ -40,6 +44,7 @@ class Goal {
       order: (map['order'] as num?)?.toInt() ?? 0,
       status: GoalStatus.fromValue(map['status'] as String?),
       achievedAt: (map['achievedAt'] as Timestamp?)?.toDate(),
+      fundingMode: GoalFundingMode.fromValue(map['fundingMode'] as String?),
     );
   }
 
@@ -53,5 +58,6 @@ class Goal {
         'status': status.value,
         'achievedAt':
             achievedAt == null ? null : Timestamp.fromDate(achievedAt!),
+        'fundingMode': fundingMode.value,
       };
 }
