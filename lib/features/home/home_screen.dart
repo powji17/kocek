@@ -83,10 +83,7 @@ class _HomeContent extends StatelessWidget {
       children: [
         _BalanceCard(
           total: summary.totalSavings,
-          // Saldo bebas disembunyikan bila ada target otomatis (selalu Rp0).
-          freeBalance: (activeGoals.isEmpty || summary.autoGoalId != null)
-              ? null
-              : summary.freeBalance,
+          freeBalance: summary.freeBalance,
         ),
         const SizedBox(height: 24),
         const _SectionTitle('Dompet'),
@@ -126,7 +123,6 @@ class _HomeContent extends StatelessWidget {
               child: _GoalCard(
                 goal: g,
                 collected: summary.goalCollected[g.id] ?? 0,
-                isAuto: summary.autoGoalId == g.id,
               ),
             ),
         ],
@@ -170,8 +166,8 @@ class _BalanceCard extends StatelessWidget {
 
   final int total;
 
-  /// null = tidak ada target aktif, jadi tidak ditampilkan.
-  final int? freeBalance;
+  /// Total tabungan dikurangi uang yang sudah dialokasikan ke target (F4 #1).
+  final int freeBalance;
 
   @override
   Widget build(BuildContext context) {
@@ -200,23 +196,21 @@ class _BalanceCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          if (freeBalance != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                'Saldo bebas ${formatRupiah(freeBalance!)}',
-                style: AppTheme.numeric(text.labelLarge).copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              'Saldo bebas ${formatRupiah(freeBalance)}',
+              style: AppTheme.numeric(text.labelLarge).copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -275,17 +269,10 @@ class _WalletTile extends StatelessWidget {
 }
 
 class _GoalCard extends StatelessWidget {
-  const _GoalCard({
-    required this.goal,
-    required this.collected,
-    required this.isAuto,
-  });
+  const _GoalCard({required this.goal, required this.collected});
 
   final Goal goal;
   final int collected;
-
-  /// true = progres mengikuti total tabungan.
-  final bool isAuto;
 
   @override
   Widget build(BuildContext context) {
@@ -364,13 +351,7 @@ class _GoalCard extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (isAuto) ...[
-              const SizedBox(height: 2),
-              Text(
-                'Mengikuti total tabungan',
-                style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
-              ),
-            ],
+
           ],
         ),
       ),

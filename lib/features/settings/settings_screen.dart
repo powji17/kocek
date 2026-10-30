@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/providers.dart';
 import '../auth/providers.dart';
 import '../bootstrap/bootstrap_gate.dart';
+import '../categories/categories_screen.dart';
 import '../wallets/wallets_screen.dart';
 
 /// Pengaturan. Sekarang: Akun, Keuangan (kelola dompet), dan Data.
@@ -179,6 +180,18 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.category_outlined),
+            title: const Text('Kelola kategori'),
+            subtitle: const Text('Tambah, ubah, atau hapus kategori'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const CategoriesScreen()),
+            ),
+          ),
+        ),
         const SizedBox(height: 24),
         Text(
           'Data',
@@ -199,7 +212,7 @@ class SettingsScreen extends ConsumerWidget {
         const SizedBox(height: 24),
         Center(
           child: Text(
-            'Kategori, target, dan tampilan\nhadir di langkah berikutnya.',
+            'Target dan tampilan\nhadir di langkah berikutnya.',
             textAlign: TextAlign.center,
             style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),

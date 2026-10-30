@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import '../models/default_categories.dart';
-import '../models/enums.dart';
 import '../models/goal.dart';
 import '../models/wallet.dart';
 
@@ -21,8 +20,7 @@ class OnboardingWallet {
   final int initialBalance;
 }
 
-/// Isian target pertama dari layar onboarding. Target ini berjalan dalam
-/// mode otomatis: progresnya mengikuti total tabungan.
+/// Isian target pertama dari layar onboarding.
 class OnboardingGoal {
   const OnboardingGoal({required this.name, required this.targetAmount});
 
@@ -43,11 +41,12 @@ class UserDataRepository {
     'categories',
   ];
 
-  /// Mengisi kategori bawaan satu kali saja, lalu mengembalikan apakah
-  /// onboarding sudah selesai. Tidak pernah melempar error; kalau status
-  /// tidak bisa dipastikan (misalnya offline tanpa cache), dianggap sudah
-  /// selesai supaya pengguna tidak terhalang.
-  Future<bool> bootstrap() async {
+  /// Mengisi kategori bawaan satu kali saja, menyalin nama dan email akun
+  /// ke dokumen pengguna (entitas User, PRD bagian 11), lalu mengembalikan
+  /// apakah onboarding sudah selesai. Tidak pernah melempar error; kalau
+  /// status tidak bisa dipastikan (misalnya offline tanpa cache), dianggap
+  /// sudah selesai supaya pengguna tidak terhalang.
+  Future<bool> bootstrap({String? name, String? email}) async {
     try {
       final snap = await _userDoc.get();
       final data = snap.data();
@@ -68,6 +67,17 @@ class UserDataRepository {
         // Tidak di-await supaya tidak menggantung saat offline.
         unawaited(batch.commit().catchError((Object _) {}));
       }
+      final profile = <String, dynamic>{
+        if (name != null && data?['name'] != name) 'name': name,
+        if (email != null && data?['email'] != email) 'email': email,
+      };
+      if (profile.isNotEmpty) {
+        unawaited(
+          _userDoc
+              .set(profile, SetOptions(merge: true))
+              .catchError((Object _) {}),
+        );
+      }
       return data?['onboardingDone'] == true;
     } on FirebaseException {
       return true;
@@ -75,7 +85,7 @@ class UserDataRepository {
   }
 
   /// Menyimpan hasil onboarding dalam SATU batch (semua atau tidak sama
-  /// sekali): dompet, target pertama (opsional, mode otomatis), dan penanda
+  /// sekali): dompet, target pertama (opsional), dan penanda
   /// onboardingDone.
   ///
   /// Tidak di-await: saat offline, batch baru selesai setelah ada internet,
@@ -110,7 +120,6 @@ class UserDataRepository {
           targetAmount: goal.targetAmount,
           iconKey: 'flag',
           colorValue: 0xFFF59E0B,
-          fundingMode: GoalFundingMode.auto,
         ).toMap(),
       );
     }

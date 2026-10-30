@@ -6,6 +6,10 @@ import 'enums.dart';
 class DefaultCategories {
   DefaultCategories._();
 
+  /// Kategori "Lainnya" menjadi penampung saat kategori lain dihapus (PRD F5).
+  static const String fallbackExpenseId = 'exp-lainnya';
+  static const String fallbackIncomeId = 'inc-lainnya';
+
   static const List<Category> all = [
     // Pengeluaran
     Category(id: 'exp-makan', name: 'Makan', iconKey: 'restaurant', colorValue: 0xFFF97316, type: CategoryType.expense, isDefault: true),

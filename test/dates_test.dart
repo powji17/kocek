@@ -23,6 +23,32 @@ void main() {
     });
   });
 
+  group('formatDateHeader', () {
+    final today = DateTime(2026, 10, 30, 10); // Jumat
+    test('hari ini', () {
+      expect(formatDateHeader(DateTime(2026, 10, 30, 8), now: today), 'Hari ini, 30 Okt 2026');
+    });
+    test('kemarin', () {
+      expect(formatDateHeader(DateTime(2026, 10, 29), now: today), 'Kemarin, 29 Okt 2026');
+    });
+    test('hari lain memakai nama hari', () {
+      expect(formatDateHeader(DateTime(2026, 10, 28), now: today), 'Rabu, 28 Okt 2026');
+      expect(formatDateHeader(DateTime(2026, 10, 25), now: today), 'Minggu, 25 Okt 2026');
+    });
+  });
+
+  group('formatRangeLabel', () {
+    test('satu hari', () {
+      expect(formatRangeLabel(DateTime(2026, 10, 28), DateTime(2026, 10, 28)), '28 Okt 2026');
+    });
+    test('tahun sama', () {
+      expect(formatRangeLabel(DateTime(2026, 10, 1), DateTime(2026, 10, 29)), '1 Okt – 29 Okt 2026');
+    });
+    test('beda tahun', () {
+      expect(formatRangeLabel(DateTime(2025, 12, 30), DateTime(2026, 1, 2)), '30 Des 2025 – 2 Jan 2026');
+    });
+  });
+
   test('formatMonthYear', () {
     expect(formatMonthYear(DateTime(2026, 10, 29)), 'Oktober 2026');
     expect(formatMonthYear(DateTime(2027, 1, 1)), 'Januari 2027');

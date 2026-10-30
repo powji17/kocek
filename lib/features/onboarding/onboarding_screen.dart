@@ -282,9 +282,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Lagi nabung buat apa? Progresnya mengikuti total tabunganmu '
-          'secara otomatis. Target lain bisa ditambah kapan saja, dan '
-          'langkah ini boleh dilewati.',
+          'Lagi nabung buat apa? Target lain bisa ditambah kapan saja, '
+          'dan langkah ini boleh dilewati.',
           style: text.bodyMedium?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 20),

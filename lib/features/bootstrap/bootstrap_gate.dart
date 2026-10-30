@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
+import '../auth/providers.dart';
 import '../onboarding/onboarding_screen.dart';
 
 /// Pengecekan awal per pengguna: mengisi kategori bawaan dan membaca apakah
@@ -9,7 +10,8 @@ import '../onboarding/onboarding_screen.dart';
 final bootstrapProvider = FutureProvider<bool>((ref) async {
   final repo = ref.watch(userDataRepositoryProvider);
   if (repo == null) return true;
-  return repo.bootstrap();
+  final user = ref.watch(authStateProvider).value;
+  return repo.bootstrap(name: user?.displayName, email: user?.email);
 });
 
 /// Penanda "baru saja menyelesaikan onboarding" agar layar langsung pindah

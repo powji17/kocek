@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/widgets/placeholder_screen.dart';
+import '../history/history_screen.dart';
 import '../home/home_screen.dart';
 import '../settings/settings_screen.dart';
 import '../transactions/quick_add_sheet.dart';
@@ -16,11 +17,7 @@ class AppShell extends ConsumerWidget {
   // IndexedStack menjaga state tiap tab saat berpindah.
   static const _screens = <Widget>[
     HomeScreen(),
-    PlaceholderScreen(
-      icon: Icons.receipt_long_outlined,
-      title: 'Riwayat',
-      message: 'Daftar transaksi, filter, dan pencarian hadir di Langkah 6.',
-    ),
+    HistoryScreen(),
     PlaceholderScreen(
       icon: Icons.pie_chart_outline,
       title: 'Statistik',

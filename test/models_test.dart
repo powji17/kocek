@@ -33,7 +33,6 @@ void main() {
       colorValue: 0xFFF59E0B,
       deadline: DateTime(2027, 3, 1),
       status: GoalStatus.achieved,
-      fundingMode: GoalFundingMode.auto,
     );
     final back = Goal.fromMap('g1', g.toMap());
     expect(back.name, 'HP Baru');
@@ -41,12 +40,6 @@ void main() {
     expect(back.status, GoalStatus.achieved);
     expect(back.deadline!.isAtSameMomentAs(g.deadline!), isTrue);
     expect(back.isActive, isFalse);
-    expect(back.fundingMode, GoalFundingMode.auto);
-  });
-
-  test('Goal lama tanpa fundingMode dibaca sebagai manual', () {
-    final g = Goal.fromMap('g', {'name': 'HP Baru', 'targetAmount': 6000000});
-    expect(g.fundingMode, GoalFundingMode.manual);
   });
 
   test('Wallet: toMap lalu fromMap', () {

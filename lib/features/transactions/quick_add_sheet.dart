@@ -11,6 +11,7 @@ import '../../core/utils/dates.dart';
 import '../../core/utils/rupiah.dart';
 import '../../data/models/category.dart';
 import '../../data/models/enums.dart';
+import '../../data/models/goal.dart';
 import '../../data/models/money_transaction.dart';
 import '../../data/models/wallet.dart';
 import '../../data/providers.dart';
@@ -18,16 +19,31 @@ import '../../domain/category_order.dart';
 
 /// Membuka formulir pencatatan cepat (PRD F3).
 Future<void> showQuickAddSheet(BuildContext context) {
+  return _showSheet(context, null);
+}
+
+/// Membuka formulir yang sama untuk mengubah transaksi (PRD F7).
+Future<void> showEditTransactionSheet(
+  BuildContext context,
+  MoneyTransaction transaction,
+) {
+  return _showSheet(context, transaction);
+}
+
+Future<void> _showSheet(BuildContext context, MoneyTransaction? editing) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => const QuickAddSheet(),
+    builder: (_) => QuickAddSheet(editing: editing),
   );
 }
 
 class QuickAddSheet extends ConsumerStatefulWidget {
-  const QuickAddSheet({super.key});
+  const QuickAddSheet({super.key, this.editing});
+
+  /// null = transaksi baru, selain itu = mengubah transaksi ini.
+  final MoneyTransaction? editing;
 
   @override
   ConsumerState<QuickAddSheet> createState() => _QuickAddSheetState();
@@ -42,13 +58,28 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   String? _toWalletId;
   String? _categoryId;
   DateTime _date = DateTime.now();
+  bool _dateChanged = false;
   bool _showNote = false;
   final TextEditingController _note = TextEditingController();
+
+  bool get _isEditing => widget.editing != null;
 
   @override
   void initState() {
     super.initState();
-    _applyDefaults();
+    final e = widget.editing;
+    if (e == null) {
+      _applyDefaults();
+    } else {
+      _type = e.type;
+      _amount = e.amount;
+      _walletId = e.walletId;
+      _toWalletId = e.toWalletId;
+      _categoryId = e.categoryId;
+      _date = e.date;
+      _note.text = e.note;
+      _showNote = e.note.isNotEmpty;
+    }
   }
 
   @override
@@ -66,6 +97,13 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
   CategoryType get _categoryType =>
       _type == TransactionType.income ? CategoryType.income : CategoryType.expense;
+
+  List<Category> _readCategoriesOfType() {
+    final categories = ref.read(categoriesProvider).value ?? const <Category>[];
+    return sortCategories(
+      categories.where((c) => c.type == _categoryType).toList(),
+    );
+  }
 
   /// Dompet dan kategori mengikuti transaksi terakhir dengan tipe yang sama,
   /// sehingga kasus umum cukup: ketik nominal lalu Simpan.
@@ -97,10 +135,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       }
       _categoryId = null;
     } else {
-      final categories = ref.read(categoriesProvider).value ?? const <Category>[];
-      final ofType = sortCategories(
-        categories.where((c) => c.type == _categoryType).toList(),
-      );
+      final ofType = _readCategoriesOfType();
       final catIds = ofType.map((c) => c.id).toSet();
       final lastCat = last?.categoryId;
       if (lastCat != null && catIds.contains(lastCat)) {
@@ -112,6 +147,25 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     }
   }
 
+  /// Saat mengubah tipe pada transaksi yang sudah ada: dompet dipertahankan,
+  /// hanya kategori / dompet tujuan yang disesuaikan.
+  void _adaptToType() {
+    final wallets = _readActiveWallets();
+    if (_type == TransactionType.transfer) {
+      _categoryId = null;
+      if (_toWalletId == null || _toWalletId == _walletId) {
+        _toWalletId = _firstOtherWallet(wallets, _walletId);
+      }
+    } else {
+      _toWalletId = null;
+      final ofType = _readCategoriesOfType();
+      final catIds = ofType.map((c) => c.id).toSet();
+      if (_categoryId == null || !catIds.contains(_categoryId)) {
+        _categoryId = ofType.isEmpty ? null : ofType.first.id;
+      }
+    }
+  }
+
   String? _firstOtherWallet(List<Wallet> wallets, String? excludeId) {
     for (final w in wallets) {
       if (w.id != excludeId) return w.id;
@@ -120,6 +174,17 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   }
 
   // ---------- Aksi ----------
+
+  void _onTypeChanged(TransactionType type) {
+    setState(() {
+      _type = type;
+      if (_isEditing) {
+        _adaptToType();
+      } else {
+        _applyDefaults();
+      }
+    });
+  }
 
   void _press(String key) {
     HapticFeedback.selectionClick();
@@ -148,11 +213,16 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _date,
+      initialDate: _date.isAfter(DateTime.now()) ? DateTime.now() : _date,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked != null) {
+      setState(() {
+        _date = picked;
+        _dateChanged = true;
+      });
+    }
   }
 
   bool get _canSave {
@@ -188,38 +258,61 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     }
   }
 
+  String _goalLabel(List<Goal> goals) {
+    final id = widget.editing?.goalId;
+    for (final g in goals) {
+      if (g.id == id) return g.name;
+    }
+    return 'target';
+  }
+
   void _save() {
     final repo = ref.read(transactionRepositoryProvider);
     if (repo == null || !_canSave) return;
 
+    final editing = widget.editing;
     final now = DateTime.now();
-    // Hari ini memakai jam sekarang (urutan rapi); tanggal lain jam 12 siang.
-    final date = isSameDay(_date, now)
-        ? now
-        : DateTime(_date.year, _date.month, _date.day, 12);
+    final DateTime date;
+    if (editing != null && !_dateChanged) {
+      date = editing.date; // jam asli dipertahankan
+    } else if (isSameDay(_date, now)) {
+      date = now;
+    } else {
+      date = DateTime(_date.year, _date.month, _date.day, 12);
+    }
     final isTransfer = _type == TransactionType.transfer;
+    final keepsGoal =
+        _type == TransactionType.expense || _type == TransactionType.goalDeposit;
 
     final tx = MoneyTransaction(
-      id: repo.newId(),
+      id: editing?.id ?? repo.newId(),
       type: _type,
       amount: _amount,
       walletId: _walletId!,
       toWalletId: isTransfer ? _toWalletId : null,
-      categoryId: isTransfer ? null : _categoryId,
+      categoryId: (isTransfer || _type == TransactionType.goalDeposit)
+          ? null
+          : _categoryId,
+      goalId: keepsGoal ? editing?.goalId : null,
       note: _note.text.trim(),
       date: date,
     );
 
-    // Tidak di-await (offline-first): tampilan sudah berubah lewat stream lokal.
-    unawaited(repo.add(tx).catchError((Object _) {}));
-
     final messenger = ScaffoldMessenger.of(context);
     final label = _savedLabel;
     final amount = _amount;
+
+    // Tidak di-await (offline-first): tampilan sudah berubah lewat stream lokal.
+    if (editing == null) {
+      unawaited(repo.add(tx).catchError((Object _) {}));
+    } else {
+      unawaited(repo.update(tx).catchError((Object _) {}));
+    }
+
     Navigator.of(context).pop();
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
+    messenger.hideCurrentSnackBar();
+    if (editing == null) {
+      messenger.showSnackBar(
         SnackBar(
           content: Text('$label ${formatRupiah(amount)} tersimpan'),
           duration: const Duration(seconds: 4),
@@ -232,6 +325,48 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           ),
         ),
       );
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Perubahan tersimpan')),
+      );
+    }
+  }
+
+  Future<void> _confirmDelete() async {
+    final editing = widget.editing;
+    final repo = ref.read(transactionRepositoryProvider);
+    if (editing == null || repo == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus transaksi ini?'),
+        content: const Text(
+          'Saldo dompet dan total tabungan akan dihitung ulang.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'Hapus',
+              style: TextStyle(color: AppColors.expense),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    unawaited(repo.delete(editing.id).catchError((Object _) {}));
+    Navigator.of(context).pop();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Transaksi dihapus')));
   }
 
   // ---------- Tampilan ----------
@@ -239,15 +374,25 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final wallets = (ref.watch(walletsProvider).value ?? const <Wallet>[])
-        .where((w) => w.active)
+    final editing = widget.editing;
+    final allWallets = ref.watch(walletsProvider).value ?? const <Wallet>[];
+    // Dompet tersembunyi tetap tampil bila dipakai transaksi yang diubah.
+    final wallets = allWallets
+        .where(
+          (w) =>
+              w.active ||
+              (editing != null &&
+                  (w.id == editing.walletId || w.id == editing.toWalletId)),
+        )
         .toList();
     final categories = sortCategories(
       (ref.watch(categoriesProvider).value ?? const <Category>[])
           .where((c) => c.type == _categoryType)
           .toList(),
     );
+    final goals = ref.watch(goalsProvider).value ?? const <Goal>[];
     final isTransfer = _type == TransactionType.transfer;
+    final isDeposit = _type == TransactionType.goalDeposit;
 
     if (wallets.isEmpty) {
       return Padding(
@@ -305,32 +450,64 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            pad(
-              SegmentedButton<TransactionType>(
-                showSelectedIcon: false,
-                expandedInsets: EdgeInsets.zero,
-                segments: const [
-                  ButtonSegment(
-                    value: TransactionType.expense,
-                    label: Text('Keluar'),
-                  ),
-                  ButtonSegment(
-                    value: TransactionType.income,
-                    label: Text('Masuk'),
-                  ),
-                  ButtonSegment(
-                    value: TransactionType.transfer,
-                    label: Text('Pindah'),
-                  ),
-                ],
-                selected: {_type},
-                onSelectionChanged: (selection) {
-                  setState(() {
-                    _type = selection.first;
-                    _applyDefaults();
-                  });
-                },
+            if (_isEditing) ...[
+              pad(
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Ubah transaksi',
+                        style: text.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: _confirmDelete,
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: AppColors.expense,
+                      ),
+                      label: const Text(
+                        'Hapus',
+                        style: TextStyle(color: AppColors.expense),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(height: 8),
+            ],
+            pad(
+              isDeposit
+                  ? Align(
+                      alignment: Alignment.centerLeft,
+                      child: Chip(
+                        avatar: const Icon(Icons.flag_outlined, size: 18),
+                        label: Text('Setor ke ${_goalLabel(goals)}'),
+                      ),
+                    )
+                  : SegmentedButton<TransactionType>(
+                      showSelectedIcon: false,
+                      expandedInsets: EdgeInsets.zero,
+                      segments: const [
+                        ButtonSegment(
+                          value: TransactionType.expense,
+                          label: Text('Keluar'),
+                        ),
+                        ButtonSegment(
+                          value: TransactionType.income,
+                          label: Text('Masuk'),
+                        ),
+                        ButtonSegment(
+                          value: TransactionType.transfer,
+                          label: Text('Pindah'),
+                        ),
+                      ],
+                      selected: {_type},
+                      onSelectionChanged: (selection) =>
+                          _onTypeChanged(selection.first),
+                    ),
             ),
             const SizedBox(height: 16),
             pad(
@@ -369,7 +546,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                   disabledId: _walletId,
                   onSelect: (id) => setState(() => _toWalletId = id),
                 ),
-            ] else ...[
+            ] else if (!isDeposit) ...[
               const SizedBox(height: 12),
               label('Kategori'),
               SizedBox(
@@ -452,7 +629,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: _canSave ? _save : null,
-                  child: const Text('Simpan'),
+                  child: Text(_isEditing ? 'Simpan perubahan' : 'Simpan'),
                 ),
               ),
             ),
