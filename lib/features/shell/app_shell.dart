@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../shared/widgets/placeholder_screen.dart';
 import '../goals/goal_celebration.dart';
 import '../history/history_screen.dart';
 import '../home/home_screen.dart';
 import '../settings/settings_screen.dart';
+import '../statistics/statistics_screen.dart';
 import '../transactions/quick_add_sheet.dart';
 import 'shell_providers.dart';
 
@@ -19,11 +19,7 @@ class AppShell extends ConsumerWidget {
   static const _screens = <Widget>[
     HomeScreen(),
     HistoryScreen(),
-    PlaceholderScreen(
-      icon: Icons.pie_chart_outline,
-      title: 'Statistik',
-      message: 'Grafik donat, batang, dan garis hadir di Langkah 8.',
-    ),
+    StatisticsScreen(),
     SettingsScreen(),
   ];
 

@@ -29,4 +29,27 @@ void main() {
     test('kosong', () => expect(parseRupiahInput(''), 0));
     test('tanpa angka', () => expect(parseRupiahInput('Rp'), 0));
   });
+
+  group('formatCompactRupiah', () {
+    test('di bawah seribu apa adanya', () {
+      expect(formatCompactRupiah(0), '0');
+      expect(formatCompactRupiah(999), '999');
+    });
+    test('ribuan', () {
+      expect(formatCompactRupiah(1000), '1 rb');
+      expect(formatCompactRupiah(1500), '1,5 rb');
+      expect(formatCompactRupiah(250000), '250 rb');
+    });
+    test('jutaan', () {
+      expect(formatCompactRupiah(1000000), '1 jt');
+      expect(formatCompactRupiah(2800000), '2,8 jt');
+      expect(formatCompactRupiah(999950), '1 jt');
+    });
+    test('miliar', () {
+      expect(formatCompactRupiah(1200000000), '1,2 M');
+    });
+    test('negatif', () {
+      expect(formatCompactRupiah(-500000), '-500 rb');
+    });
+  });
 }

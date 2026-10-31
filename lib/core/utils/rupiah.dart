@@ -36,3 +36,22 @@ int parseRupiahInput(String input) {
   if (digits.isEmpty) return 0;
   return int.tryParse(digits) ?? 0;
 }
+
+/// Format ringkas untuk label sumbu grafik, contoh: 250000 -> "250 rb",
+/// 1500000 -> "1,5 jt", 1200000000 -> "1,2 M".
+String formatCompactRupiah(int amount) {
+  final sign = amount < 0 ? '-' : '';
+  final v = amount.abs();
+
+  String fmt(double x, String unit) {
+    final fixed = x.toStringAsFixed(1);
+    final text =
+        fixed.endsWith('.0') ? fixed.substring(0, fixed.length - 2) : fixed.replaceFirst('.', ',');
+    return '$sign$text $unit';
+  }
+
+  if (v >= 999950000) return fmt(v / 1e9, 'M');
+  if (v >= 999950) return fmt(v / 1e6, 'jt');
+  if (v >= 1000) return fmt(v / 1e3, 'rb');
+  return '$sign$v';
+}
