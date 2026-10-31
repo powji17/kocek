@@ -46,6 +46,13 @@ String formatRangeLabel(DateTime from, DateTime to) {
   return '${d(from)} ${from.year} – ${d(to)} ${to.year}';
 }
 
+/// "30 Okt 14.05" — tanggal dan jam singkat (dipakai pada widget).
+String formatDateTimeShort(DateTime date) {
+  final hh = date.hour.toString().padLeft(2, '0');
+  final mm = date.minute.toString().padLeft(2, '0');
+  return '${date.day} ${_monthsShort[date.month - 1]} $hh.$mm';
+}
+
 /// "Oktober 2026".
 String formatMonthYear(DateTime date) {
   return '${_monthsLong[date.month - 1]} ${date.year}';

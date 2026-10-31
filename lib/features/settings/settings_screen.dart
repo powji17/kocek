@@ -8,6 +8,8 @@ import '../auth/providers.dart';
 import '../bootstrap/bootstrap_gate.dart';
 import '../categories/categories_screen.dart';
 import '../goals/goals_screen.dart';
+import '../widget/widget_service.dart';
+import '../widget/widget_settings_screen.dart';
 import '../wallets/wallets_screen.dart';
 
 /// Pengaturan. Sekarang: Akun, Keuangan (kelola dompet), dan Data.
@@ -36,6 +38,8 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
     if (confirmed == true) {
+      // Kosongkan widget supaya saldo tidak tertinggal di layar utama.
+      await clearWidget();
       await ref.read(authRepositoryProvider).signOut();
       // AuthGate otomatis kembali ke layar login.
     }
@@ -202,6 +206,25 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const GoalsScreen()),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Aplikasi',
+          style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.widgets_outlined),
+            title: const Text('Widget homescreen'),
+            subtitle: const Text('Pilih target dan sembunyikan nominal'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const WidgetSettingsScreen(),
+              ),
             ),
           ),
         ),

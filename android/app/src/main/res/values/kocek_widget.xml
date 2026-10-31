@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Palet "Teal Tenang" (PRD bagian 14) -->
+    <color name="kocek_white">#FFFFFF</color>
+    <color name="kocek_primary">#0F766E</color>
+    <color name="kocek_goal">#F59E0B</color>
+    <color name="kocek_divider">#E5E7EB</color>
+    <color name="kocek_text_primary">#1F2937</color>
+    <color name="kocek_text_secondary">#6B7280</color>
+
+    <string name="kocek_widget_title">Total tabungan</string>
+    <string name="kocek_widget_add_desc">Catat transaksi</string>
+    <string name="kocek_widget_description">Saldo dan progres target Kocek</string>
+</resources>
