@@ -1,5 +1,3 @@
-import 'dart:math' show max;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +7,7 @@ import '../../core/ui/icon_keys.dart';
 import '../../core/utils/dates.dart';
 import '../../core/utils/rupiah.dart';
 import '../../data/models/category.dart';
+import '../../data/models/enums.dart';
 import '../../data/models/goal.dart';
 import '../../data/models/money_transaction.dart';
 import '../../data/models/wallet.dart';
@@ -16,7 +15,11 @@ import '../../data/providers.dart';
 import '../../domain/balances.dart';
 import '../../domain/monthly_summary.dart';
 import '../../shared/widgets/transaction_tile.dart';
+import '../goals/goal_actions.dart';
+import '../goals/goal_card.dart';
+import '../goals/goals_screen.dart';
 import '../shell/shell_providers.dart';
+import '../transactions/quick_add_sheet.dart';
 
 /// Beranda (PRD F4): saldo, dompet, target, ringkasan bulan ini, dan
 /// transaksi terbaru, semuanya memakai data asli.
@@ -115,16 +118,19 @@ class _HomeContent extends StatelessWidget {
           ),
         if (activeGoals.isNotEmpty) ...[
           const SizedBox(height: 24),
-          const _SectionTitle('Target'),
-          const SizedBox(height: 12),
-          for (final g in activeGoals)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _GoalCard(
-                goal: g,
-                collected: summary.goalCollected[g.id] ?? 0,
+          Row(
+            children: [
+              const Expanded(child: _SectionTitle('Target')),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const GoalsScreen()),
+                ),
+                child: const Text('Lihat semua'),
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _GoalCarousel(goals: activeGoals, collected: summary.goalCollected),
         ],
         const SizedBox(height: 24),
         _MonthlySummarySection(
@@ -261,97 +267,6 @@ class _WalletTile extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GoalCard extends StatelessWidget {
-  const _GoalCard({required this.goal, required this.collected});
-
-  final Goal goal;
-  final int collected;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final target = goal.targetAmount;
-    final progress = target <= 0 ? 0.0 : (collected / target).clamp(0.0, 1.0);
-    final percent = (progress * 100).round();
-    final remaining = max(0, target - collected);
-    final accent = Color(goal.colorValue);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(iconForKey(goal.iconKey), size: 22, color: accent),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    goal.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: text.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Text(
-                  '$percent%',
-                  style: AppTheme.numeric(text.titleMedium).copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Bar progres terisi dengan animasi singkat (PRD bagian 14).
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: progress),
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, _) => ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: value,
-                  minHeight: 10,
-                  color: accent,
-                  backgroundColor: AppColors.divider,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Terkumpul ${formatRupiah(collected)} dari ${formatRupiah(target)}',
-              style: AppTheme.numeric(text.bodyMedium).copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              progress >= 1
-                  ? 'Target tercapai, selamat!'
-                  : 'Sisa ${formatRupiah(remaining)} lagi, semangat!',
-              style: AppTheme.numeric(text.bodyMedium).copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-
           ],
         ),
       ),
@@ -518,6 +433,60 @@ class _RecentTransactions extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Kartu target yang bisa digeser ke samping bila lebih dari satu (PRD F4 #3).
+class _GoalCarousel extends ConsumerWidget {
+  const _GoalCarousel({required this.goals, required this.collected});
+
+  final List<Goal> goals;
+  final Map<String, int> collected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Lebih dari satu target: kartu sedikit lebih sempit agar kartu
+        // berikutnya mengintip dan terlihat bisa digeser.
+        final width =
+            goals.length > 1 ? constraints.maxWidth * 0.88 : constraints.maxWidth;
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < goals.length; i++)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      right: i == goals.length - 1 ? 0 : 12,
+                    ),
+                    child: SizedBox(
+                      width: width,
+                      child: GoalCard(
+                        goal: goals[i],
+                        collected: collected[goals[i].id] ?? 0,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const GoalsScreen(),
+                          ),
+                        ),
+                        onDeposit: () => showQuickAddSheet(
+                          context,
+                          initialType: TransactionType.goalDeposit,
+                          initialGoalId: goals[i].id,
+                        ),
+                        onMarkAchieved: () => markGoalAchieved(ref, goals[i]),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

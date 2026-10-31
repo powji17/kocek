@@ -54,4 +54,30 @@ class Goal {
         'achievedAt':
             achievedAt == null ? null : Timestamp.fromDate(achievedAt!),
       };
+
+  /// [clearDeadline] / [clearAchievedAt] dipakai untuk mengosongkan nilainya.
+  Goal copyWith({
+    String? name,
+    int? targetAmount,
+    String? iconKey,
+    int? colorValue,
+    DateTime? deadline,
+    bool clearDeadline = false,
+    int? order,
+    GoalStatus? status,
+    DateTime? achievedAt,
+    bool clearAchievedAt = false,
+  }) {
+    return Goal(
+      id: id,
+      name: name ?? this.name,
+      targetAmount: targetAmount ?? this.targetAmount,
+      iconKey: iconKey ?? this.iconKey,
+      colorValue: colorValue ?? this.colorValue,
+      deadline: clearDeadline ? null : (deadline ?? this.deadline),
+      order: order ?? this.order,
+      status: status ?? this.status,
+      achievedAt: clearAchievedAt ? null : (achievedAt ?? this.achievedAt),
+    );
+  }
 }

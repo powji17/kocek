@@ -78,4 +78,34 @@ const List<int> categoryColorPalette = [
   0xFFEF4444,
 ];
 
+/// Pilihan ikon untuk target tabungan (PRD F6).
+const List<String> goalIconKeys = [
+  'flag',
+  'phone',
+  'travel',
+  'home',
+  'car',
+  'books',
+  'health',
+  'savings',
+  'games',
+  'music',
+  'fitness',
+  'pets',
+  'school',
+  'shopping_bag',
+];
+
+/// Pilihan warna untuk target tabungan; yang pertama (amber) adalah bawaan.
+const List<int> goalColorPalette = [
+  0xFFF59E0B,
+  0xFF0F766E,
+  0xFF3B82F6,
+  0xFF8B5CF6,
+  0xFFEC4899,
+  0xFFEF4444,
+  0xFF22C55E,
+  0xFF0EA5E9,
+];
+
 IconData iconForKey(String key) => _icons[key] ?? Icons.circle_outlined;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/widgets/placeholder_screen.dart';
+import '../goals/goal_celebration.dart';
 import '../history/history_screen.dart';
 import '../home/home_screen.dart';
 import '../settings/settings_screen.dart';
@@ -29,6 +30,8 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(selectedTabProvider);
+    // Perayaan sederhana saat progres sebuah target menembus 100% (PRD F6).
+    listenForGoalCelebration(ref, context);
     return Scaffold(
       appBar: AppBar(title: Text(_titles[index])),
       body: IndexedStack(index: index, children: _screens),
